@@ -20,17 +20,14 @@ jobs:
     # https://p3terx.com/archives/github-actions-manual-trigger.html
     
     steps:
-      - uses: actions/checkout@v2
-
-      - name: Install Python
-        run: |
-          sudo apt update && \
-          sudo apt install python3
-          
-          #    - name: requirements
-          #      run: |
-          #        pip3 install -r requirements.txt
-        # if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      - uses: actions/checkout@v3
+      - name: Set up Python 3
+        uses: actions/setup-python@v4
+      #      - name: install requirements
+      #        run: |
+      #          python -m pip install --upgrade pip
+      #          pip3 install -r requirements.txt
+      #          # if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
       - name: Checkin
         run: |
           python3 ./glados/main.py

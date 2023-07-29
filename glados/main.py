@@ -17,7 +17,6 @@ session = requests.session()
 # push推送
 def pushplus_bot(title, content):
     try:
-        print("\n")
         if not PUSHPLUS_TOKEN:
             print("PUSHPLUS服务的token未设置!!\n取消推送")
             return
@@ -83,7 +82,7 @@ def main():
     for cookie in cookies:
         ret, remain, email = checkin(cookie)
         content = f"账号：{email}\n签到结果：{ret}\n剩余天数：{remain}\n"
-        print(content)
+        print(f"账号：{str(email[0:2])}****{str(email[-4:-1])}\n签到结果：{ret}\n剩余天数：{remain}\n")
         contents.append(content)
     contents_str = "".join(contents)
     pushplus_bot(title, contents_str)
