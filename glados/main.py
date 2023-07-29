@@ -1,49 +1,97 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+import json
 import os
-import re
-import argparse
 
-from glados import glados
-from messageSender import MessageSender
+import requests
 
-if __name__ == "__main__":
+# 填入glados账号对应cookie
+GLADOS_COOKIE = os.environ["GLADOS_COOKIE"]
+cookies = GLADOS_COOKIE.split('\n')
+PUSHPLUS_TOKEN = os.environ["PUSHPLUS_TOKEN"]
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--cookie_string", type=str, required=True)
+session = requests.session()
 
-    args= parser.parse_args()
-    cookie_string = args.cookie_string
-    pushplus_token = os.environ.get("PUSHPLUS_TOKEN", None)
-    serverChan_sendkey = os.environ.get("SERVERCHAN_SENDKEY", None)
-    weCom_webhook = os.environ.get("WECOM_WEBHOOK", None)
-    bark_deviceKey = os.environ.get("BARK_DEVICEKEY", None)
 
-    message_tokens = {
-        "pushplus_token": pushplus_token,
-        "serverChan_token": serverChan_sendkey,
-        "weCom_webhook": weCom_webhook,
-        "bark_deviceKey": bark_deviceKey
+# push推送
+def pushplus_bot(title, content):
+    try:
+        print("\n")
+        if not PUSHPLUS_TOKEN:
+            print("PUSHPLUS服务的token未设置!!\n取消推送")
+            return
+        print("PUSHPLUS服务启动")
+        url = 'http://www.pushplus.plus/send'
+        data = {
+            "token": PUSHPLUS_TOKEN,
+            "title": title,
+            "content": content
+        }
+        body = json.dumps(data).encode(encoding='utf-8')
+        headers = {'Content-Type': 'application/json'}
+        response = requests.post(url=url, data=body, headers=headers).json()
+        if response['code'] == 200:
+            print('推送成功！')
+        else:
+            print('推送失败！')
+    except Exception as e:
+        print(e)
+
+
+def checkin(cookie):
+    checkin_url = "https://glados.rocks/api/user/checkin"
+    state_url = "https://glados.rocks/api/user/status"
+    referer = 'https://glados.rocks/console/checkin'
+    origin = "https://glados.rocks"
+    useragent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.69 Safari/537.36"
+    payload = {"token": "glados.one"}
+    head1 = {
+        'cookie': cookie,
+        'referer': referer,
+        'origin': origin,
+        'user-agent': useragent,
+        'content-type': 'application/json;charset=UTF-8'
     }
+    head2 = {
+        'cookie': cookie,
+        'referer': referer,
+        'origin': origin,
+        'user-agent': useragent
+    }
+    try:
+        checkin = session.post(checkin_url, headers=head1, data=json.dumps(payload))
+        state = session.get(state_url, headers=head2)
+    except Exception as e:
+        print(f"签到失败，请检查网络：{e}")
+        return None, None, None
+    try:
+        mess = checkin.json()['message']
+        mail = state.json()['data']['email']
+        time = state.json()['data']['leftDays'].split('.')[0]
+    except Exception as e:
+        print(f"解析登录结果失败：{e}")
+        return None, None, None
+    return mess, time, mail
 
-    message_sender = MessageSender()
 
-    message_all = str()
-    cookie_string = cookie_string.split("&&")
-    checkin_codes = list()
-    for idx, cookie in enumerate(cookie_string):
-        print(f"【Account_{idx+1}】:")
-        message_all = f"{message_all}【Account_{idx+1}】:\n"
-        checkin_code, message = glados(cookie)
-        checkin_codes.append(checkin_code)
-        message_all = f"{message_all}{message}\n"
+def main():
+    title = "GlaDOS签到通知"
+    contents = []
+    if not cookies:
+        return ""
+    for cookie in cookies:
+        ret, remain, email = checkin(cookie)
+        content = f"账号：{email}\n签到结果：{ret}\n剩余天数：{remain}\n"
+        print(content)
+        contents.append(content)
+    contents_str = "".join(contents)
+    pushplus_bot(title, contents_str)
 
-    if -2 not in checkin_codes and checkin_codes.count(0) + checkin_codes.count(1) == len(checkin_codes):
-        title = "GLaDOS check in successful"
-    else:
-        title = "GLaDOS check in failed"
-    message_all = f"{title}\n{message_all}"
-    message_all = re.sub("\n+","\n", message_all)
-    if message_all.endswith("\n"): message_all = message_all[:-1]
-    message_sender.send_all(message_tokens= message_tokens, title = title, content = message_all)
 
-    assert -2 not in checkin_codes, "At least one account login fails."
-    assert checkin_codes.count(0) + checkin_codes.count(1) == len(checkin_codes), "Not all the accounts check in successful."
+def main_handler(event, context):
+    return main()
+
+
+if __name__ == '__main__':
+    main()
